@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinFlow — Finance Dashboard</title>
+
+  <!-- Google Fonts: Sora (display) + JetBrains Mono (numbers) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN (Play CDN for class generation) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Sora', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- React 18 + ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* ===== BASE RESET & GLOBALS ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:    #080a0f;
+      --bg-surface: #111318;
+      --bg-raised:  #181c24;
+      --bg-border:  #242834;
+      --bg-hover:   #1e2330;
+      --text-1:     #f1f5f9;
+      --text-2:     #94a3b8;
+      --text-3:     #64748b;
+      --text-4:     #475569;
+      --gold:       #f5a623;
+      --gold-dim:   #c4841c;
+      --gold-glow:  rgba(245,166,35,0.12);
+      --emerald:    #34d399;
+      --emerald-bg: rgba(52,211,153,0.10);
+      --rose:       #fb7185;
+      --rose-bg:    rgba(251,113,133,0.10);
+      --blue:       #60a5fa;
+      --blue-bg:    rgba(96,165,250,0.10);
+      --purple:     #a78bfa;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-1);
+      font-family: 'Sora', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+    /* ===== LAYOUT ===== */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: 240px;
+      height: 100vh;
+      background: var(--bg-base);
+      border-right: 1px solid var(--bg-raised);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 16px;
+      z-index: 50;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      overflow-y: auto;
+    }
+    .main-content {
+      margin-left: 240px;
+      min-height: 100vh;
+      padding: 32px 36px;
+    }
+
+    /* ===== CARDS ===== */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--bg-border);
+      border-radius: 16px;
+    }
+    .card-raised {
+      background: var(--bg-raised);
+      border: 1px solid var(--bg-border);
+      border-radius: 16px;
+    }
+
+    /* ===== SUMMARY CARDS ===== */
+    .summary-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--bg-border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: default;
+    }
+    .summary-card:hover { transform: translateY(-3px); border-color: #3a4050; }
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      opacity: 0.8;
+    }
+    .summary-card.gold::before  { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+    .summary-card.gold:hover    { box-shadow: 0 8px 30px rgba(245,166,35,0.08); }
+    .summary-card.emerald::before { background: linear-gradient(90deg, transparent, var(--emerald), transparent); }
+    .summary-card.emerald:hover { box-shadow: 0 8px 30px rgba(52,211,153,0.08); }
+    .summary-card.rose::before  { background: linear-gradient(90deg, transparent, var(--rose), transparent); }
+    .summary-card.rose:hover    { box-shadow: 0 8px 30px rgba(251,113,133,0.08); }
+    .summary-card.blue::before  { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+    .summary-card.blue:hover    { box-shadow: 0 8px 30px rgba(96,165,250,0.08); }
+
+    /* ===== NAVIGATION ===== */
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--text-3);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.18s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .nav-item:hover { background: var(--bg-raised); color: var(--text-2); }
+    .nav-item.active { background: var(--gold-glow); color: var(--gold); }
+
+    /* ===== BUTTONS ===== */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--gold);
+      color: #080a0f;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-family: 'Sora', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-primary:hover { background: #fbbf47; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(245,166,35,0.25); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: transparent;
+      color: var(--text-2);
+      border: 1px solid var(--bg-border);
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-family: 'Sora', sans-serif;
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+    .btn-ghost:hover { background: var(--bg-raised); border-color: #3a4050; color: var(--text-1); }
+
+    .btn-icon {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 6px;
+      color: var(--text-4);
+      transition: all 0.15s ease;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-icon:hover { background: var(--bg-raised); color: var(--text-2); }
+    .btn-icon.danger:hover { color: var(--rose); }
+    .btn-icon.edit-icon:hover { color: var(--gold); }
+
+    /* ===== FORM ELEMENTS ===== */
+    .input-field {
+      background: var(--bg-raised);
+      border: 1px solid var(--bg-border);
+      color: var(--text-1);
+      padding: 9px 13px;
+      border-radius: 10px;
+      font-family: 'Sora', sans-serif;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.18s ease;
+      width: 100%;
+    }
+    .input-field:focus { border-color: var(--gold); }
+    .input-field::placeholder { color: var(--text-4); }
+    .input-field option { background: var(--bg-raised); color: var(--text-1); }
+
+    /* ===== BADGES ===== */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .badge-income  { background: var(--emerald-bg); color: var(--emerald); }
+    .badge-expense { background: var(--rose-bg); color: var(--rose); }
+    .badge-cat     { background: rgba(245,166,35,0.08); color: var(--gold); font-size: 10px; padding: 2px 8px; }
+
+    /* ===== TABLE ===== */
+    .tx-table-head {
+      display: grid;
+      grid-template-columns: 2.2fr 1.1fr 1.1fr 1fr 1fr;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--bg-border);
+    }
+    .tx-row {
+      display: grid;
+      grid-template-columns: 2.2fr 1.1fr 1.1fr 1fr 1fr;
+      align-items: center;
+      padding: 13px 20px;
+      border-bottom: 1px solid #13161e;
+      transition: background 0.12s ease;
+    }
+    .tx-row:last-child { border-bottom: none; }
+    .tx-row:hover { background: #0e1116; }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.18s ease;
+    }
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--bg-border);
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 460px;
+      animation: slideUp 0.25s ease;
+    }
+
+    /* ===== PROGRESS BAR ===== */
+    .progress-track { height: 5px; background: var(--bg-border); border-radius: 3px; overflow: hidden; }
+    .progress-fill  { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+
+    /* ===== INSIGHT CARD ===== */
+    .insight-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--bg-border);
+      border-radius: 14px;
+      padding: 20px 22px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .insight-card:hover { transform: translateY(-2px); border-color: #3a4050; }
+
+    /* ===== MOBILE TOGGLE ===== */
+    .mobile-menu-btn {
+      display: none;
+      background: transparent;
+      border: 1px solid var(--bg-border);
+      border-radius: 8px;
+      padding: 7px;
+      cursor: pointer;
+      color: var(--text-2);
+    }
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 49;
+    }
+
+    /* ===== CHIPS ===== */
+    .chip {
+      padding: 5px 13px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--bg-border);
+      background: transparent;
+      color: var(--text-3);
+      font-family: 'Sora', sans-serif;
+      transition: all 0.18s ease;
+    }
+    .chip:hover, .chip.active { background: var(--gold-glow); border-color: var(--gold); color: var(--gold); }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideIn { from { transform: translateX(-12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .page-enter { animation: slideIn 0.3s ease; }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center;
+      padding: 56px 20px;
+      color: var(--text-4);
+    }
+    .empty-state .emoji { font-size: 40px; margin-bottom: 14px; display: block; }
+    .empty-state .title { font-size: 15px; font-weight: 600; color: var(--text-3); margin-bottom: 4px; }
+    .empty-state .sub   { font-size: 12px; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-overlay { display: block; }
+      .main-content { margin-left: 0; padding: 24px 18px; }
+      .mobile-menu-btn { display: flex; }
+      .tx-table-head, .tx-row { grid-template-columns: 1.6fr 1fr 1fr; }
+      .tx-table-head > *:nth-child(4),
+      .tx-table-head > *:nth-child(5),
+      .tx-row > *:nth-child(4),
+      .tx-row > *:nth-child(5) { display: none; }
+      .charts-grid { grid-template-columns: 1fr !important; }
+      .insights-grid { grid-template-columns: 1fr !important; }
+      .cards-grid { grid-template-columns: 1fr 1fr !important; }
+    }
+    @media (max-width: 560px) {
+      .cards-grid { grid-template-columns: 1fr !important; }
+      .modal-box { padding: 22px 18px; }
+      .controls-row { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useContext, createContext, useRef, useMemo, useCallback } = React;
+
+/* ================================================================
+   SECTION 1 — CONSTANTS & MOCK DATA
+   ================================================================ */
+
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const CATEGORY_COLORS = {
+  'Salary':             '#34d399',
+  'Freelance':          '#60a5fa',
+  'Investment Returns': '#a78bfa',
+  'Bonus':              '#f472b6',
+  'Food & Dining':      '#f59e0b',
+  'Transport':          '#38bdf8',
+  'Housing':            '#fb7185',
+  'Entertainment':      '#c084fc',
+  'Healthcare':         '#4ade80',
+  'Shopping':           '#f87171',
+  'Utilities':          '#94a3b8',
+  'Education':          '#22d3ee',
+};
+
+const EXPENSE_CATEGORIES = [
+  'Food & Dining','Transport','Housing','Entertainment',
+  'Healthcare','Shopping','Utilities','Education'
+];
+const INCOME_CATEGORIES = ['Salary','Freelance','Investment Returns','Bonus'];
+
+const SEED_TRANSACTIONS = [
+  // ── January ──
+  { id:1,  date:'2025-01-05', description:'Monthly Salary',       amount:75000, category:'Salary',             type:'income'  },
+  { id:2,  date:'2025-01-07', description:'Grocery Store',         amount:3200,  category:'Food & Dining',      type:'expense' },
+  { id:3,  date:'2025-01-10', description:'Electric Bill',         amount:1800,  category:'Utilities',          type:'expense' },
+  { id:4,  date:'2025-01-12', description:'Netflix Subscription',  amount:649,   category:'Entertainment',      type:'expense' },
+  { id:5,  date:'2025-01-15', description:'Freelance Project',     amount:15000, category:'Freelance',          type:'income'  },
+  { id:6,  date:'2025-01-18', description:'Fuel',                  amount:2500,  category:'Transport',          type:'expense' },
+  { id:7,  date:'2025-01-20', description:'Doctor Visit',          amount:800,   category:'Healthcare',         type:'expense' },
+  { id:8,  date:'2025-01-25', description:'Online Shopping',       amount:4500,  category:'Shopping',           type:'expense' },
+  { id:9,  date:'2025-01-28', description:'House Rent',            amount:18000, category:'Housing',            type:'expense' },
+  // ── February ──
+  { id:10, date:'2025-02-05', description:'Monthly Salary',        amount:75000, category:'Salary',             type:'income'  },
+  { id:11, date:'2025-02-08', description:'Restaurant Dinner',     amount:2800,  category:'Food & Dining',      type:'expense' },
+  { id:12, date:'2025-02-10', description:'Electric Bill',         amount:1650,  category:'Utilities',          type:'expense' },
+  { id:13, date:'2025-02-14', description:"Valentine's Gift",      amount:3500,  category:'Shopping',           type:'expense' },
+  { id:14, date:'2025-02-18', description:'Freelance Project',     amount:22000, category:'Freelance',          type:'income'  },
+  { id:15, date:'2025-02-20', description:'Metro Card',            amount:500,   category:'Transport',          type:'expense' },
+  { id:16, date:'2025-02-25', description:'Online Course',         amount:2999,  category:'Education',          type:'expense' },
+  { id:17, date:'2025-02-28', description:'House Rent',            amount:18000, category:'Housing',            type:'expense' },
+  // ── March ──
+  { id:18, date:'2025-03-05', description:'Monthly Salary',        amount:75000, category:'Salary',             type:'income'  },
+  { id:19, date:'2025-03-08', description:'Grocery Store',         amount:4100,  category:'Food & Dining',      type:'expense' },
+  { id:20, date:'2025-03-12', description:'Annual Bonus',          amount:30000, category:'Bonus',              type:'income'  },
+  { id:21, date:'2025-03-15', description:'Gym Membership',        amount:1500,  category:'Healthcare',         type:'expense' },
+  { id:22, date:'2025-03-18', description:'Fuel',                  amount:2800,  category:'Transport',          type:'expense' },
+  { id:23, date:'2025-03-22', description:'Clothes Shopping',      amount:6500,  category:'Shopping',           type:'expense' },
+  { id:24, date:'2025-03-25', description:'Movie Tickets',         amount:1200,  category:'Entertainment',      type:'expense' },
+  { id:25, date:'2025-03-28', description:'House Rent',            amount:18000, category:'Housing',            type:'expense' },
+  // ── April ──
+  { id:26, date:'2025-04-05', description:'Monthly Salary',        amount:75000, category:'Salary',             type:'income'  },
+  { id:27, date:'2025-04-07', description:'Grocery Store',         amount:3600,  category:'Food & Dining',      type:'expense' },
+  { id:28, date:'2025-04-10', description:'Electricity Bill',      amount:1900,  category:'Utilities',          type:'expense' },
+  { id:29, date:'2025-04-14', description:'Investment Returns',    amount:8500,  category:'Investment Returns', type:'income'  },
+  { id:30, date:'2025-04-18', description:'Freelance Project',     amount:18000, category:'Freelance',          type:'income'  },
+  { id:31, date:'2025-04-20', description:'Medical Checkup',       amount:2500,  category:'Healthcare',         type:'expense' },
+  { id:32, date:'2025-04-24', description:'Concert Tickets',       amount:3500,  category:'Entertainment',      type:'expense' },
+  { id:33, date:'2025-04-28', description:'House Rent',            amount:18000, category:'Housing',            type:'expense' },
+  // ── May ──
+  { id:34, date:'2025-05-05', description:'Monthly Salary',        amount:75000, category:'Salary',             type:'income'  },
+  { id:35, date:'2025-05-08', description:'Restaurant Dinner',     amount:3200,  category:'Food & Dining',      type:'expense' },
+  { id:36, date:'2025-05-12', description:'Electric Bill',         amount:2100,  category:'Utilities',          type:'expense' },
+  { id:37, date:'2025-05-15', description:'Flight Tickets',        amount:12000, category:'Transport',          type:'expense' },
+  { id:38, date:'2025-05-20', description:'Hotel Stay',            amount:8500,  category:'Entertainment',      type:'expense' },
+  { id:39, date:'2025-05-22', description:'Freelance Project',     amount:25000, category:'Freelance',          type:'income'  },
+  { id:40, date:'2025-05-28', description:'House Rent',            amount:18000, category:'Housing',            type:'expense' },
+  // ── June ──
+  { id:41, date:'2025-06-05', description:'Monthly Salary',        amount:75000, category:'Salary',             type:'income'  },
+  { id:42, date:'2025-06-08', description:'Grocery Store',         amount:3800,  category:'Food & Dining',      type:'expense' },
+  { id:43, date:'2025-06-10', description:'Internet Bill',         amount:999,   category:'Utilities',          type:'expense' },
+  { id:44, date:'2025-06-15', description:'Investment Returns',    amount:11000, category:'Investment Returns', type:'income'  },
+  { id:45, date:'2025-06-18', description:'Uber Rides',            amount:1800,  category:'Transport',          type:'expense' },
+  { id:46, date:'2025-06-22', description:'New Laptop',            amount:55000, category:'Shopping',           type:'expense' },
+  { id:47, date:'2025-06-25', description:'Spotify Premium',       amount:119,   category:'Entertainment',      type:'expense' },
+  { id:48, date:'2025-06-28', description:'House Rent',            amount:18000, category:'Housing',            type:'expense' },
+];
+
+/* ================================================================
+   SECTION 2 — UTILITY FUNCTIONS
+   ================================================================ */
+
+const fmtINR = (amount) => {
+  if (amount >= 100000) return `₹${(amount/100000).toFixed(2)}L`;
+  if (amount >= 1000)   return `₹${(amount/1000).toFixed(1)}K`;
+  return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+};
+
+const fmtDate = (d) =>
+  new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+const getMonthlyData = (txs) => {
+  const m = {};
+  txs.forEach(t => {
+    const key = MONTHS_SHORT[new Date(t.date).getMonth()];
+    if (!m[key]) m[key] = { income:0, expense:0 };
+    m[key][t.type] += t.amount;
+  });
+  return m;
+};
+
+const getCatBreakdown = (txs) => {
+  const c = {};
+  txs.filter(t => t.type==='expense').forEach(t => { c[t.category]=(c[t.category]||0)+t.amount; });
+  return c;
+};
+
+const exportCSV = (txs) => {
+  const head = ['ID','Date','Description','Category','Type','Amount (INR)'];
+  const rows = txs.map(t => [t.id, t.date, `"${t.description}"`, t.category, t.type, t.amount]);
+  const csv  = [head, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href:url, download:'finflow_transactions.csv' });
+  a.click(); URL.revokeObjectURL(url);
+};
+
+const exportJSON = (txs) => {
+  const blob = new Blob([JSON.stringify(txs, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href:url, download:'finflow_transactions.json' });
+  a.click(); URL.revokeObjectURL(url);
+};
+
+/* ================================================================
+   SECTION 3 — STATE MANAGEMENT (React Context)
+   ================================================================ */
+
+const AppCtx = createContext(null);
+
+const AppProvider = ({ children }) => {
+  // Persist transactions to localStorage
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const s = localStorage.getItem('ff_txs');
+      return s ? JSON.parse(s) : SEED_TRANSACTIONS;
+    } catch { return SEED_TRANSACTIONS; }
+  });
+
+  // Role: 'admin' | 'viewer'
+  const [role, setRole] = useState(() => localStorage.getItem('ff_role') || 'admin');
+
+  // Current page
+  const [page, setPage] = useState('dashboard');
+
+  // Sidebar (mobile)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Filters & sort (Transactions page)
+  const [filters, setFilters] = useState({
+    search: '', type: 'all', category: 'all', month: 'all',
+    sortBy: 'date', sortDir: 'desc',
+  });
+
+  // Persist
+  useEffect(() => { try { localStorage.setItem('ff_txs',  JSON.stringify(transactions)); } catch {} }, [transactions]);
+  useEffect(() => { localStorage.setItem('ff_role', role); }, [role]);
+
+  // CRUD
+  const addTx = useCallback((form) => {
+    setTransactions(p => [{ ...form, id: Date.now(), amount: parseFloat(form.amount) }, ...p]);
+  }, []);
+
+  const updateTx = useCallback((id, form) => {
+    setTransactions(p => p.map(t => t.id===id ? { ...t, ...form, amount: parseFloat(form.amount) } : t));
+  }, []);
+
+  const deleteTx = useCallback((id) => {
+    setTransactions(p => p.filter(t => t.id !== id));
+  }, []);
+
+  const resetData = () => {
+    if (confirm('Reset all data to defaults?')) {
+      setTransactions(SEED_TRANSACTIONS);
+    }
+  };
+
+  // Filtered + sorted transactions
+  const filtered = useMemo(() => {
+    let r = [...transactions];
+    const q = filters.search.toLowerCase();
+    if (q)                     r = r.filter(t => t.description.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
+    if (filters.type !== 'all')     r = r.filter(t => t.type === filters.type);
+    if (filters.category !== 'all') r = r.filter(t => t.category === filters.category);
+    if (filters.month !== 'all')    r = r.filter(t => MONTHS_SHORT[new Date(t.date).getMonth()] === filters.month);
+    r.sort((a, b) => {
+      let va = a[filters.sortBy], vb = b[filters.sortBy];
+      if (filters.sortBy === 'date')   { va = new Date(va); vb = new Date(vb); }
+      if (filters.sortBy === 'amount') { va = +va; vb = +vb; }
+      return filters.sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+    });
+    return r;
+  }, [transactions, filters]);
+
+  // Summary stats
+  const summary = useMemo(() => {
+    const income  = transactions.filter(t=>t.type==='income' ).reduce((s,t)=>s+t.amount,0);
+    const expense = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    return { income, expense, balance: income-expense, savingsRate: income>0 ? (income-expense)/income*100 : 0 };
+  }, [transactions]);
+
+  return (
+    <AppCtx.Provider value={{
+      transactions, filtered, summary,
+      role, setRole,
+      page, setPage,
+      sidebarOpen, setSidebarOpen,
+      filters, setFilters,
+      addTx, updateTx, deleteTx, resetData,
+    }}>
+      {children}
+    </AppCtx.Provider>
+  );
+};
+
+const useApp = () => useContext(AppCtx);
+
+/* ================================================================
+   SECTION 4 — INLINE SVG ICONS
+   ================================================================ */
+
+const ICONS = {
+  dashboard:    'M3 3h7v7H3V3zm11 0h7v7h-7V3zm0 11h7v7h-7v-7zM3 14h7v7H3v-7z',
+  transactions: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+  insights:     'M22 12h-4l-3 9L9 3l-3 9H2',
+  plus:         'M12 5v14M5 12h14',
+  edit:         'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z',
+  trash:        'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2',
+  search:       'M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z',
+  x:            'M18 6L6 18M6 6l12 12',
+  menu:         'M3 12h18M3 6h18M3 18h18',
+  download:     'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
+  arrowUp:      'M18 15l-6-6-6 6',
+  arrowDown:    'M6 9l6 6 6-6',
+  trendingUp:   'M23 6L13.5 15.5 8.5 10.5 1 18M17 6h6v6',
+  wallet:       'M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4M4 6v12c0 1.1.9 2 2 2h14v-4M18 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+  shield:       'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  eye:          'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  bulb:         'M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14',
+  filter:       'M22 3H2l8 9.46V19l4 2V12.46L22 3z',
+  refresh:      'M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15',
+  savings:      'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 8 8c0 1 .23 1.99.64 2.88M12 20l-2-2c-1.88-1.88-4-3.5-4-6 0-2.64 1.72-5 4.58-5.41L12 7l1.42.59C16.28 8 18 10.36 18 13c0 2.5-2.12 4.12-4 6l-2 2z',
+};
+
+const Icon = ({ name, size=16, color='currentColor', strokeWidth=2 }) => (
+  <svg
+    width={size} height={size}
+    viewBox="0 0 24 24" fill="none"
+    stroke={color} strokeWidth={strokeWidth}
+    strokeLinecap="round" strokeLinejoin="round"
+    style={{ flexShrink:0, display:'block' }}
+  >
+    <path d={ICONS[name]} />
+  </svg>
+);
+
+/* ================================================================
+   SECTION 5 — SIDEBAR COMPONENT
+   ================================================================ */
+
+const Sidebar = () => {
+  const { page, setPage, sidebarOpen, setSidebarOpen } = useApp();
+
+  const nav = [
+    { id:'dashboard',    label:'Dashboard',    icon:'dashboard'    },
+    { id:'transactions', label:'Transactions', icon:'transactions' },
+    { id:'insights',     label:'Insights',     icon:'insights'     },
+  ];
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" style={{ display:'block' }} onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        {/* Logo */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:14, marginBottom:36 }}>
+          <div style={{
+            width:38, height:38, borderRadius:11,
+            background:'rgba(245,166,35,0.14)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            <Icon name="wallet" size={17} color="#f5a623" />
+          </div>
+          <div>
+            <div style={{ fontWeight:800, fontSize:17, color:'#f1f5f9', letterSpacing:'-0.5px' }}>FinFlow</div>
+            <div style={{ fontSize:9, color:'#334155', textTransform:'uppercase', letterSpacing:'1.8px', marginTop:1 }}>Dashboard</div>
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <nav style={{ flex:1 }}>
+          <div style={{ fontSize:9, color:'#334155', textTransform:'uppercase', letterSpacing:'1.6px', paddingLeft:14, marginBottom:8 }}>Menu</div>
+          {nav.map(n => (
+            <div
+              key={n.id}
+              className={`nav-item ${page===n.id ? 'active' : ''}`}
+              onClick={() => { setPage(n.id); setSidebarOpen(false); }}
+            >
+              <Icon name={n.icon} size={15} />
+              {n.label}
+            </div>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div style={{ borderTop:'1px solid var(--bg-raised)', paddingTop:16, marginTop:16 }}>
+          <div style={{ fontSize:9, color:'#334155', textTransform:'uppercase', letterSpacing:'1.6px', paddingLeft:14, marginBottom:6 }}>Build</div>
+          <div style={{ paddingLeft:14, fontSize:11, color:'#334155' }}>v1.0.0 · 2025</div>
+        </div>
+      </aside>
+    </>
+  );
+};
+
+/* ================================================================
+   SECTION 6 — HEADER COMPONENT
+   ================================================================ */
+
+const Header = ({ title, subtitle }) => {
+  const { role, setRole, setSidebarOpen } = useApp();
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:28 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
+          <Icon name="menu" size={18} />
+        </button>
+        <div>
+          <h1 style={{ fontSize:21, fontWeight:700, color:'var(--text-1)', letterSpacing:'-0.4px' }}>{title}</h1>
+          {subtitle && <p style={{ fontSize:12, color:'var(--text-4)', marginTop:2 }}>{subtitle}</p>}
+        </div>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        {/* Role switcher */}
+        <div style={{
+          display:'flex', alignItems:'center', gap:8,
+          background:'var(--bg-surface)', border:'1px solid var(--bg-border)',
+          borderRadius:10, padding:'7px 12px',
+        }}>
+          <Icon name={role==='admin' ? 'shield' : 'eye'} size={13} color={role==='admin' ? '#f5a623' : '#64748b'} />
+          <select
+            value={role}
+            onChange={e => setRole(e.target.value)}
+            style={{
+              background:'transparent', border:'none',
+              color:'var(--text-1)', fontSize:12,
+              fontFamily:'Sora, sans-serif', fontWeight:600,
+              cursor:'pointer', outline:'none',
+            }}
+          >
+            <option value="admin">Admin</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </div>
+
+        {/* Avatar */}
+        <div style={{
+          width:36, height:36, borderRadius:10,
+          background: role==='admin'
+            ? 'linear-gradient(135deg,#f5a623,#c4841c)'
+            : 'linear-gradient(135deg,#60a5fa,#3b82f6)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontSize:13, fontWeight:700, color:'#080a0f',
+        }}>
+          {role==='admin' ? 'A' : 'V'}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 7 — SUMMARY CARD
+   ================================================================ */
+
+const SummaryCard = ({ label, value, sub, color, icon, trend }) => {
+  const accent = { gold:'#f5a623', emerald:'#34d399', rose:'#fb7185', blue:'#60a5fa' }[color];
+  const bg     = { gold:'rgba(245,166,35,0.08)', emerald:'rgba(52,211,153,0.08)', rose:'rgba(251,113,133,0.08)', blue:'rgba(96,165,250,0.08)' }[color];
+
+  return (
+    <div className={`summary-card ${color}`}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+        <span style={{ fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'1px', fontWeight:600 }}>{label}</span>
+        <div style={{ width:32, height:32, borderRadius:8, background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Icon name={icon} size={15} color={accent} />
+        </div>
+      </div>
+
+      <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:22, fontWeight:600, color:'var(--text-1)', letterSpacing:'-0.8px', marginBottom:5 }}>
+        {value}
+      </div>
+
+      {sub && <div style={{ fontSize:11, color:'var(--text-4)', marginBottom:trend!==undefined ? 8 : 0 }}>{sub}</div>}
+
+      {trend !== undefined && (
+        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color: trend>=0 ? '#34d399' : '#fb7185' }}>
+          <Icon name={trend>=0 ? 'arrowUp' : 'arrowDown'} size={11} color={trend>=0 ? '#34d399' : '#fb7185'} />
+          {Math.abs(trend).toFixed(1)}% vs last month
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 8 — CHART: INCOME VS EXPENSES (Line)
+   ================================================================ */
+
+const BalanceTrendChart = ({ transactions }) => {
+  const ref  = useRef(null);
+  const inst = useRef(null);
+
+  useEffect(() => {
+    const monthly  = getMonthlyData(transactions);
+    const labels   = Object.keys(monthly);
+    const incData  = labels.map(m => monthly[m].income);
+    const expData  = labels.map(m => monthly[m].expense);
+
+    if (inst.current) inst.current.destroy();
+
+    const ctx = ref.current.getContext('2d');
+    const gI  = ctx.createLinearGradient(0,0,0,260);
+    gI.addColorStop(0,'rgba(52,211,153,0.28)');
+    gI.addColorStop(1,'rgba(52,211,153,0)');
+    const gE  = ctx.createLinearGradient(0,0,0,260);
+    gE.addColorStop(0,'rgba(251,113,133,0.18)');
+    gE.addColorStop(1,'rgba(251,113,133,0)');
+
+    inst.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label:'Income',   data:incData, borderColor:'#34d399', backgroundColor:gI, borderWidth:2, pointBackgroundColor:'#34d399', pointRadius:4, pointHoverRadius:6, tension:0.4, fill:true },
+          { label:'Expenses', data:expData, borderColor:'#fb7185', backgroundColor:gE, borderWidth:2, pointBackgroundColor:'#fb7185', pointRadius:4, pointHoverRadius:6, tension:0.4, fill:true },
+        ],
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ intersect:false, mode:'index' },
+        plugins:{
+          legend:{ display:true, position:'top',
+            labels:{ color:'#64748b', font:{ family:'Sora', size:11 }, boxWidth:10, boxHeight:10, padding:16 }
+          },
+          tooltip:{
+            backgroundColor:'#1a1f2e', titleColor:'#94a3b8', bodyColor:'#f1f5f9',
+            borderColor:'#2a2f3e', borderWidth:1, padding:12, cornerRadius:10,
+            callbacks:{ label: c => ` ${c.dataset.label}: ₹${c.raw.toLocaleString('en-IN')}` }
+          }
+        },
+        scales:{
+          x:{ grid:{ color:'#111318', drawBorder:false }, ticks:{ color:'#475569', font:{ family:'Sora', size:11 } } },
+          y:{ grid:{ color:'#111318', drawBorder:false }, ticks:{ color:'#475569', font:{ family:'JetBrains Mono', size:10 }, callback: v=>`₹${(v/1000).toFixed(0)}K` } }
+        }
+      }
+    });
+
+    return () => { if(inst.current) inst.current.destroy(); };
+  }, [transactions]);
+
+  return <div style={{ position:'relative', height:260 }}><canvas ref={ref} /></div>;
+};
+
+/* ================================================================
+   SECTION 9 — CHART: SPENDING BREAKDOWN (Doughnut)
+   ================================================================ */
+
+const SpendingChart = ({ transactions }) => {
+  const ref  = useRef(null);
+  const inst = useRef(null);
+
+  const breakdown = useMemo(() => getCatBreakdown(transactions), [transactions]);
+
+  useEffect(() => {
+    const entries = Object.entries(breakdown).sort((a,b)=>b[1]-a[1]).slice(0,7);
+    const labels  = entries.map(([k])=>k);
+    const values  = entries.map(([,v])=>v);
+    const colors  = labels.map(l => CATEGORY_COLORS[l]||'#94a3b8');
+
+    if (inst.current) inst.current.destroy();
+    const ctx = ref.current.getContext('2d');
+
+    inst.current = new Chart(ctx, {
+      type:'doughnut',
+      data:{
+        labels,
+        datasets:[{
+          data:values,
+          backgroundColor: colors.map(c => c+'99'),
+          borderColor: colors,
+          borderWidth:2,
+          hoverOffset:8,
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        cutout:'68%',
+        plugins:{
+          legend:{ position:'right',
+            labels:{ color:'#64748b', font:{ family:'Sora', size:10 }, boxWidth:9, boxHeight:9, padding:9 }
+          },
+          tooltip:{
+            backgroundColor:'#1a1f2e', titleColor:'#94a3b8', bodyColor:'#f1f5f9',
+            borderColor:'#2a2f3e', borderWidth:1, padding:12, cornerRadius:10,
+            callbacks:{
+              label: c => {
+                const total = values.reduce((a,b)=>a+b,0);
+                return ` ₹${c.raw.toLocaleString('en-IN')} (${((c.raw/total)*100).toFixed(1)}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return () => { if(inst.current) inst.current.destroy(); };
+  }, [breakdown]);
+
+  return <div style={{ position:'relative', height:220 }}><canvas ref={ref} /></div>;
+};
+
+/* ================================================================
+   SECTION 10 — DASHBOARD PAGE
+   ================================================================ */
+
+const DashboardPage = () => {
+  const { transactions, summary, setPage } = useApp();
+
+  // Month-on-month trend calculation (May vs June)
+  const monthIndex  = (transactions, mIdx, type) =>
+    transactions.filter(t => new Date(t.date).getMonth()===mIdx && t.type===type).reduce((s,t)=>s+t.amount,0);
+
+  const curI = monthIndex(transactions, 5, 'income');
+  const preI = monthIndex(transactions, 4, 'income');
+  const curE = monthIndex(transactions, 5, 'expense');
+  const preE = monthIndex(transactions, 4, 'expense');
+  const iT   = preI > 0 ? (curI-preI)/preI*100 : 0;
+  const eT   = preE > 0 ? (curE-preE)/preE*100 : 0;
+
+  const recent = useMemo(() =>
+    [...transactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5),
+  [transactions]);
+
+  return (
+    <div className="page-enter">
+      <Header title="Dashboard" subtitle="Your financial overview at a glance" />
+
+      {/* ── Summary Cards ── */}
+      <div className="cards-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:22 }}>
+        <SummaryCard label="Total Balance"  value={fmtINR(summary.balance)}      sub="Net position"          color="gold"    icon="wallet"      />
+        <SummaryCard label="Total Income"   value={fmtINR(summary.income)}       sub="All income streams"    color="emerald" icon="trendingUp"  trend={iT} />
+        <SummaryCard label="Total Expenses" value={fmtINR(summary.expense)}      sub="All spending"          color="rose"    icon="transactions" trend={eT} />
+        <SummaryCard label="Savings Rate"   value={`${summary.savingsRate.toFixed(1)}%`} sub="Income minus expenses" color="blue"    icon="shield"      />
+      </div>
+
+      {/* ── Charts ── */}
+      <div className="charts-grid" style={{ display:'grid', gridTemplateColumns:'1.65fr 1fr', gap:14, marginBottom:22 }}>
+        <div className="card" style={{ padding:22 }}>
+          <div style={{ marginBottom:18 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-1)' }}>Income vs Expenses</div>
+            <div style={{ fontSize:11, color:'var(--text-4)', marginTop:2 }}>Monthly trend — Jan to Jun 2025</div>
+          </div>
+          <BalanceTrendChart transactions={transactions} />
+        </div>
+        <div className="card" style={{ padding:22 }}>
+          <div style={{ marginBottom:18 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-1)' }}>Spending by Category</div>
+            <div style={{ fontSize:11, color:'var(--text-4)', marginTop:2 }}>Top expense categories</div>
+          </div>
+          <SpendingChart transactions={transactions} />
+        </div>
+      </div>
+
+      {/* ── Recent Transactions ── */}
+      <div className="card">
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px 20px 0' }}>
+          <div>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-1)' }}>Recent Transactions</div>
+            <div style={{ fontSize:11, color:'var(--text-4)', marginTop:2 }}>Latest 5 entries</div>
+          </div>
+          <button className="btn-ghost" style={{ fontSize:12 }} onClick={() => setPage('transactions')}>View All →</button>
+        </div>
+        <div style={{ marginTop:14 }}>
+          {recent.map(tx => (
+            <div key={tx.id} style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              padding:'12px 20px', borderBottom:'1px solid #111318'
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{
+                  width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center',
+                  background: tx.type==='income' ? 'rgba(52,211,153,0.1)' : 'rgba(251,113,133,0.1)'
+                }}>
+                  <Icon name={tx.type==='income' ? 'arrowUp' : 'arrowDown'} size={14} color={tx.type==='income' ? '#34d399' : '#fb7185'} />
+                </div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:500, color:'var(--text-1)' }}>{tx.description}</div>
+                  <div style={{ fontSize:11, color:'var(--text-4)', marginTop:1 }}>{tx.category} · {fmtDate(tx.date)}</div>
+                </div>
+              </div>
+              <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:13, fontWeight:600, color: tx.type==='income' ? '#34d399' : '#fb7185' }}>
+                {tx.type==='income' ? '+' : '−'}₹{tx.amount.toLocaleString('en-IN')}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 11 — TRANSACTION MODAL (Admin only)
+   ================================================================ */
+
+const TxModal = ({ existing, onClose }) => {
+  const { addTx, updateTx } = useApp();
+  const isEdit = !!existing;
+
+  const [form, setForm] = useState({
+    date:        existing?.date        || new Date().toISOString().split('T')[0],
+    description: existing?.description || '',
+    amount:      existing?.amount      || '',
+    category:    existing?.category    || 'Food & Dining',
+    type:        existing?.type        || 'expense',
+  });
+
+  const cats = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleTypeChange = (t) => {
+    set('type', t);
+    set('category', t==='income' ? 'Salary' : 'Food & Dining');
+  };
+
+  const submit = () => {
+    if (!form.description.trim() || !form.amount || !form.date) {
+      alert('Please fill in all fields.');
+      return;
+    }
+    isEdit ? updateTx(existing.id, form) : addTx(form);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onMouseDown={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal-box">
+        {/* Header */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:22 }}>
+          <div>
+            <h2 style={{ fontSize:16, fontWeight:700, color:'var(--text-1)' }}>
+              {isEdit ? 'Edit Transaction' : 'Add Transaction'}
+            </h2>
+            <p style={{ fontSize:11, color:'var(--text-4)', marginTop:2 }}>
+              {isEdit ? 'Update the transaction details below' : 'Record a new transaction'}
+            </p>
+          </div>
+          <button className="btn-icon" onClick={onClose}><Icon name="x" size={16} /></button>
+        </div>
+
+        {/* Type toggle */}
+        <div style={{ display:'flex', gap:8, marginBottom:18 }}>
+          {['expense','income'].map(t => (
+            <button
+              key={t}
+              onClick={() => handleTypeChange(t)}
+              style={{
+                flex:1, padding:'9px', borderRadius:10, cursor:'pointer',
+                border: form.type===t ? `1px solid ${t==='income' ? '#34d399' : '#fb7185'}` : '1px solid var(--bg-border)',
+                background: form.type===t ? (t==='income' ? 'rgba(52,211,153,0.09)' : 'rgba(251,113,133,0.09)') : 'transparent',
+                color: form.type===t ? (t==='income' ? '#34d399' : '#fb7185') : 'var(--text-3)',
+                fontFamily:'Sora, sans-serif', fontSize:13, fontWeight:600,
+                transition:'all 0.18s',
+              }}
+            >
+              {t==='income' ? '↑ Income' : '↓ Expense'}
+            </button>
+          ))}
+        </div>
+
+        {/* Fields */}
+        <div style={{ display:'grid', gap:13 }}>
+          <div>
+            <label style={{ fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px', display:'block', marginBottom:6 }}>Description *</label>
+            <input className="input-field" value={form.description} onChange={e=>set('description',e.target.value)} placeholder="e.g. Monthly Salary" />
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:11 }}>
+            <div>
+              <label style={{ fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px', display:'block', marginBottom:6 }}>Amount (₹) *</label>
+              <input className="input-field" type="number" min="1" value={form.amount} onChange={e=>set('amount',e.target.value)} placeholder="0" />
+            </div>
+            <div>
+              <label style={{ fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px', display:'block', marginBottom:6 }}>Date *</label>
+              <input className="input-field" type="date" value={form.date} onChange={e=>set('date',e.target.value)} style={{ colorScheme:'dark' }} />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px', display:'block', marginBottom:6 }}>Category</label>
+            <select className="input-field" value={form.category} onChange={e=>set('category',e.target.value)}>
+              {cats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display:'flex', gap:10, marginTop:22 }}>
+          <button className="btn-ghost" onClick={onClose} style={{ flex:1, justifyContent:'center' }}>Cancel</button>
+          <button className="btn-primary" onClick={submit} style={{ flex:1, justifyContent:'center' }}>
+            {isEdit ? 'Update' : 'Add Transaction'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 12 — TRANSACTIONS PAGE
+   ================================================================ */
+
+const TransactionsPage = () => {
+  const { role, filtered, transactions, filters, setFilters, deleteTx } = useApp();
+  const [modal, setModal]     = useState(false);
+  const [editTx, setEditTx]   = useState(null);
+  const [exportMenu, setExportMenu] = useState(false);
+
+  const allCats = useMemo(() => [...new Set(transactions.map(t=>t.category))].sort(), [transactions]);
+
+  const toggleSort = (field) => {
+    setFilters(f => ({
+      ...f,
+      sortBy:  field,
+      sortDir: f.sortBy===field ? (f.sortDir==='asc' ? 'desc' : 'asc') : 'desc',
+    }));
+  };
+
+  const SortArrow = ({ field }) => {
+    if (filters.sortBy !== field) return <span style={{ color:'#334155', marginLeft:3 }}>↕</span>;
+    return <span style={{ color:'#f5a623', marginLeft:3 }}>{filters.sortDir==='asc' ? '↑' : '↓'}</span>;
+  };
+
+  const openAdd  = () => { setEditTx(null); setModal(true); };
+  const openEdit = (tx) => { setEditTx(tx); setModal(true); };
+
+  return (
+    <div className="page-enter">
+      <Header title="Transactions" subtitle={`Showing ${filtered.length} of ${transactions.length} entries`} />
+
+      {/* ── Controls ── */}
+      <div className="controls-row" style={{ display:'flex', gap:10, marginBottom:18, alignItems:'center', flexWrap:'wrap' }}>
+        {/* Search */}
+        <div style={{ position:'relative', flex:'1 1 200px', minWidth:180 }}>
+          <div style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}>
+            <Icon name="search" size={13} color="#475569" />
+          </div>
+          <input
+            className="input-field"
+            style={{ paddingLeft:32 }}
+            placeholder="Search description or category…"
+            value={filters.search}
+            onChange={e => setFilters(f=>({...f,search:e.target.value}))}
+          />
+        </div>
+
+        <select className="input-field" style={{ flex:'0 0 auto', width:'auto' }} value={filters.type} onChange={e=>setFilters(f=>({...f,type:e.target.value}))}>
+          <option value="all">All Types</option>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+
+        <select className="input-field" style={{ flex:'0 0 auto', width:'auto' }} value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))}>
+          <option value="all">All Categories</option>
+          {allCats.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+
+        <select className="input-field" style={{ flex:'0 0 auto', width:'auto' }} value={filters.month} onChange={e=>setFilters(f=>({...f,month:e.target.value}))}>
+          <option value="all">All Months</option>
+          {MONTHS_SHORT.slice(0,6).map(m=><option key={m} value={m}>{m} 2025</option>)}
+        </select>
+
+        {/* Export */}
+        <div style={{ position:'relative' }}>
+          <button className="btn-ghost" onClick={()=>setExportMenu(v=>!v)}>
+            <Icon name="download" size={13} /> Export
+          </button>
+          {exportMenu && (
+            <div style={{
+              position:'absolute', right:0, top:'calc(100% + 6px)',
+              background:'var(--bg-raised)', border:'1px solid var(--bg-border)', borderRadius:10,
+              overflow:'hidden', zIndex:10, minWidth:140,
+            }}>
+              <div
+                style={{ padding:'10px 14px', cursor:'pointer', fontSize:12, color:'var(--text-2)', transition:'background 0.15s' }}
+                onMouseEnter={e=>e.target.style.background='var(--bg-hover)'}
+                onMouseLeave={e=>e.target.style.background='transparent'}
+                onClick={()=>{ exportCSV(filtered); setExportMenu(false); }}
+              >Export as CSV</div>
+              <div
+                style={{ padding:'10px 14px', cursor:'pointer', fontSize:12, color:'var(--text-2)', transition:'background 0.15s' }}
+                onMouseEnter={e=>e.target.style.background='var(--bg-hover)'}
+                onMouseLeave={e=>e.target.style.background='transparent'}
+                onClick={()=>{ exportJSON(filtered); setExportMenu(false); }}
+              >Export as JSON</div>
+            </div>
+          )}
+        </div>
+
+        {/* Reset filters */}
+        {(filters.search || filters.type!=='all' || filters.category!=='all' || filters.month!=='all') && (
+          <button className="btn-ghost" onClick={()=>setFilters(f=>({...f,search:'',type:'all',category:'all',month:'all'}))}>
+            Clear filters
+          </button>
+        )}
+
+        {role==='admin' && (
+          <button className="btn-primary" onClick={openAdd}>
+            <Icon name="plus" size={13} /> Add Transaction
+          </button>
+        )}
+      </div>
+
+      {/* ── Table ── */}
+      <div className="card" style={{ overflow:'hidden' }}>
+        <div className="tx-table-head">
+          {[
+            { label:'Description', field:'description' },
+            { label:'Date',        field:'date'        },
+            { label:'Category',    field:null          },
+            { label:'Amount',      field:'amount'      },
+            { label:'Type / Action', field:null        },
+          ].map(({ label, field }) => (
+            <div
+              key={label}
+              onClick={() => field && toggleSort(field)}
+              style={{
+                fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600,
+                cursor: field ? 'pointer' : 'default', userSelect:'none',
+                display:'flex', alignItems:'center',
+              }}
+            >
+              {label}{field && <SortArrow field={field} />}
+            </div>
+          ))}
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="empty-state">
+            <span className="emoji">💸</span>
+            <div className="title">No transactions found</div>
+            <div className="sub">Try adjusting your search or filters</div>
+          </div>
+        ) : filtered.map(tx => (
+          <div key={tx.id} className="tx-row">
+            {/* Description */}
+            <div>
+              <div style={{ fontSize:13, fontWeight:500, color:'var(--text-1)', marginBottom:2 }}>{tx.description}</div>
+            </div>
+            {/* Date */}
+            <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, color:'var(--text-3)' }}>{fmtDate(tx.date)}</div>
+            {/* Category */}
+            <div><span className="badge badge-cat">{tx.category}</span></div>
+            {/* Amount */}
+            <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:13, fontWeight:600, color: tx.type==='income' ? '#34d399' : '#fb7185' }}>
+              {tx.type==='income' ? '+' : '−'}₹{tx.amount.toLocaleString('en-IN')}
+            </div>
+            {/* Type + Actions */}
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span className={`badge badge-${tx.type}`}>{tx.type}</span>
+              {role==='admin' && (
+                <>
+                  <button className="btn-icon edit-icon" onClick={()=>openEdit(tx)} title="Edit"><Icon name="edit" size={13} /></button>
+                  <button className="btn-icon danger" onClick={()=>{ if(confirm('Delete this transaction?')) deleteTx(tx.id); }} title="Delete"><Icon name="trash" size={13} /></button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {modal && <TxModal existing={editTx} onClose={()=>{ setModal(false); setEditTx(null); }} />}
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 13 — INSIGHTS PAGE
+   ================================================================ */
+
+const InsightsPage = () => {
+  const { transactions } = useApp();
+
+  const breakdown  = useMemo(() => getCatBreakdown(transactions), [transactions]);
+  const monthlyRaw = useMemo(() => getMonthlyData(transactions), [transactions]);
+
+  const monthlyArr = useMemo(() =>
+    Object.entries(monthlyRaw).map(([m, d]) => ({ month:m, ...d, net:d.income-d.expense })),
+  [monthlyRaw]);
+
+  const totalExpense  = Object.values(breakdown).reduce((s,v)=>s+v, 0);
+  const totalIncome   = transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const sortedCats    = Object.entries(breakdown).sort((a,b)=>b[1]-a[1]);
+  const topCat        = sortedCats[0];
+  const bestMonth     = monthlyArr.reduce((b,m)=>m.net>b.net?m:b, monthlyArr[0]||{month:'—',net:0});
+  const avgIncome     = monthlyArr.length ? monthlyArr.reduce((s,m)=>s+m.income,0)/monthlyArr.length : 0;
+  const avgExpense    = monthlyArr.length ? monthlyArr.reduce((s,m)=>s+m.expense,0)/monthlyArr.length : 0;
+  const maxIncome     = Math.max(...monthlyArr.map(m=>m.income), 1);
+
+  const tip = topCat?.[0] === 'Housing'
+    ? 'Housing dominates your expenses. Explore shared arrangements or negotiating rent to free up cash.'
+    : `Your ${topCat?.[0]} spending is your largest outflow. Setting a monthly cap could increase your savings rate.`;
+
+  const insightCards = [
+    {
+      icon:'filter', color:'#f5a623', bg:'rgba(245,166,35,0.09)',
+      label:'Top Expense Category',
+      value: topCat?.[0] || '—',
+      sub: topCat ? `₹${topCat[1].toLocaleString('en-IN')} · ${((topCat[1]/totalExpense)*100).toFixed(1)}% of total spending` : '',
+    },
+    {
+      icon:'trendingUp', color:'#34d399', bg:'rgba(52,211,153,0.09)',
+      label:'Best Savings Month',
+      value: `${bestMonth.month} 2025`,
+      sub: `Net saved: ₹${bestMonth.net?.toLocaleString('en-IN') || 0}`,
+    },
+    {
+      icon:'wallet', color:'#60a5fa', bg:'rgba(96,165,250,0.09)',
+      label:'Monthly Averages',
+      value: `${fmtINR(avgIncome)} in`,
+      sub: `${fmtINR(avgExpense)} out  ·  ${((avgIncome-avgExpense)/avgIncome*100).toFixed(1)}% saved`,
+    },
+    {
+      icon:'bulb', color:'#a78bfa', bg:'rgba(167,139,250,0.09)',
+      label:'Smart Tip',
+      value: null,
+      sub: tip,
+    },
+  ];
+
+  return (
+    <div className="page-enter">
+      <Header title="Insights" subtitle="Patterns and observations from your financial data" />
+
+      {/* ── Insight Cards ── */}
+      <div className="insights-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:22 }}>
+        {insightCards.map(c => (
+          <div key={c.label} className="insight-card">
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:c.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <Icon name={c.icon} size={14} color={c.color} />
+              </div>
+              <span style={{ fontSize:10, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px', fontWeight:600 }}>{c.label}</span>
+            </div>
+            {c.value && (
+              <div style={{ fontSize:16, fontWeight:700, color:'var(--text-1)', marginBottom:5, lineHeight:1.2 }}>{c.value}</div>
+            )}
+            {c.sub && (
+              <div style={{ fontSize:11, color:'var(--text-4)', lineHeight:1.6 }}>{c.sub}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Monthly Breakdown + Category Ranks ── */}
+      <div className="insights-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+
+        {/* Monthly net bar */}
+        <div className="card" style={{ padding:22 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text-1)', marginBottom:4 }}>Monthly Performance</div>
+          <div style={{ fontSize:11, color:'var(--text-4)', marginBottom:20 }}>Income, expenses and net savings per month</div>
+
+          {monthlyArr.map(m => {
+            const incPct = (m.income / maxIncome) * 100;
+            const expPct = (m.expense / maxIncome) * 100;
+            return (
+              <div key={m.month} style={{ marginBottom:16 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6, alignItems:'center' }}>
+                  <span style={{ fontSize:12, color:'var(--text-2)', fontWeight:500 }}>{m.month}</span>
+                  <div style={{ display:'flex', gap:14 }}>
+                    <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color:'#34d399' }}>+{fmtINR(m.income)}</span>
+                    <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color:'#fb7185' }}>−{fmtINR(m.expense)}</span>
+                    <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color: m.net>=0 ? '#34d399' : '#fb7185', fontWeight:600 }}>
+                      {m.net>=0?'+':''}{fmtINR(m.net)}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display:'grid', gap:3 }}>
+                  <div className="progress-track">
+                    <div className="progress-fill" style={{ width:`${incPct}%`, background:'#34d399' }} />
+                  </div>
+                  <div className="progress-track">
+                    <div className="progress-fill" style={{ width:`${expPct}%`, background:'#fb7185' }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Category ranks */}
+        <div className="card" style={{ padding:22 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text-1)', marginBottom:4 }}>Expense Category Ranking</div>
+          <div style={{ fontSize:11, color:'var(--text-4)', marginBottom:20 }}>All expense categories by total spend</div>
+
+          {sortedCats.map(([cat, amt], i) => {
+            const pct = (amt / totalExpense) * 100;
+            const col = CATEGORY_COLORS[cat] || '#94a3b8';
+            return (
+              <div key={cat} style={{ marginBottom:13 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ width:6, height:6, borderRadius:2, background:col, flexShrink:0 }} />
+                    <span style={{ fontSize:12, color:'var(--text-2)' }}>{cat}</span>
+                    {i===0 && <span style={{ fontSize:9, background:'rgba(245,166,35,0.1)', color:'#f5a623', padding:'1px 6px', borderRadius:4, fontWeight:700 }}>TOP</span>}
+                  </div>
+                  <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                    <span style={{ fontFamily:'JetBrains Mono', fontSize:10, color:'var(--text-4)' }}>{pct.toFixed(1)}%</span>
+                    <span style={{ fontFamily:'JetBrains Mono', fontSize:11, color:'var(--text-1)', fontWeight:600 }}>₹{(amt/1000).toFixed(1)}K</span>
+                  </div>
+                </div>
+                <div className="progress-track">
+                  <div className="progress-fill" style={{ width:`${pct}%`, background:col, opacity:.75 }} />
+                </div>
+              </div>
+            );
+          })}
+
+          {sortedCats.length===0 && (
+            <div className="empty-state" style={{ padding:'24px 0' }}>
+              <div className="sub">No expense data found</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 14 — ROOT APP
+   ================================================================ */
+
+const App = () => {
+  const { page } = useApp();
+  const pages = { dashboard:<DashboardPage/>, transactions:<TransactionsPage/>, insights:<InsightsPage/> };
+
+  return (
+    <div>
+      <Sidebar />
+      <main className="main-content">
+        {pages[page] || <DashboardPage />}
+      </main>
+    </div>
+  );
+};
+
+/* ================================================================
+   SECTION 15 — MOUNT
+   ================================================================ */
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AppProvider><App /></AppProvider>
+);
+</script>
+</body>
+</html>
